@@ -1,3 +1,3 @@
 #!/bin/bash
 
-emcc -pthread example.c -o example.js
+emcc -pthread -s PTHREAD_POOL_SIZE=1 example.c -o example.js

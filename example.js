@@ -1311,6 +1311,11 @@ function dbg(text) {
         }
       },
   initMainThread() {
+        var pthreadPoolSize = 1;
+        // Start loading up the Worker pool, if requested.
+        while (pthreadPoolSize--) {
+          PThread.allocateUnusedWorker();
+        }
         // MINIMAL_RUNTIME takes care of calling loadWasmModuleToAllWorkers
         // in postamble_minimal.js
         addOnPreRun(() => {
@@ -1412,6 +1417,13 @@ function dbg(text) {
             cancelThread(d['thread']);
           } else if (cmd === 'loaded') {
             worker.loaded = true;
+            // Check that this worker doesn't have an associated pthread.
+            if (ENVIRONMENT_IS_NODE && !worker.pthread_ptr) {
+              // Once worker is loaded & idle, mark it as weakly referenced,
+              // so that mere existence of a Worker in the pool does not prevent
+              // Node.js from exiting the app.
+              worker.unref();
+            }
             onFinishedLoading(worker);
           } else if (cmd === 'alert') {
             alert(`Thread ${d['threadId']}: ${d['text']}`);
@@ -1481,7 +1493,15 @@ function dbg(text) {
         });
       }),
   loadWasmModuleToAllWorkers(onMaybeReady) {
-        onMaybeReady();
+        // Instantiation is synchronous in pthreads.
+        if (
+          ENVIRONMENT_IS_PTHREAD
+        ) {
+          return onMaybeReady();
+        }
+  
+        let pthreadPoolReady = Promise.all(PThread.unusedWorkers.map(PThread.loadWasmModuleToWorker));
+        pthreadPoolReady.then(onMaybeReady);
       },
   allocateUnusedWorker() {
         var worker;
