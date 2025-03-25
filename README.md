@@ -1,0 +1,1 @@
+from https://web.dev/articles/webassembly-threads
